@@ -4,7 +4,10 @@ import com.amadeu.landprotection.claim.Claim;
 import com.amadeu.landprotection.claim.ClaimManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -15,8 +18,8 @@ public class ClaimVisualizationManager {
 
     private static final Map<UUID, ActiveVisualization> activeVisualizations = new HashMap<>();
 
-    private static final int OUT_OF_CLAIM_TIMEOUT_TICKS = 20 * 30; // 30 segundos
-    private static final int PARTICLE_INTERVAL_TICKS = 10; // redesenha a cada 10 ticks
+    private static final int OUT_OF_CLAIM_TIMEOUT_TICKS = 20 * 30;
+    private static final int PARTICLE_INTERVAL_TICKS = 10;
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -27,9 +30,8 @@ public class ClaimVisualizationManager {
                 UUID playerUuid = entry.getKey();
                 ActiveVisualization active = entry.getValue();
 
-                ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerUuid);
+                ServerPlayer player = server.getPlayerList().getPlayer(playerUuid);
 
-                // remove ao deslogar
                 if (player == null) {
                     iterator.remove();
                     continue;
@@ -37,22 +39,19 @@ public class ClaimVisualizationManager {
 
                 Claim claim = ClaimManager.getClaimByPlayer(playerUuid);
 
-                // remove se o player não tiver mais claim
                 if (claim == null) {
                     iterator.remove();
                     continue;
                 }
 
-                // conta tempo fora da claim
-                if (claim.contains(player.getBlockPos())) {
+                if (claim.contains(player.blockPosition())) {
                     active.ticksOutsideClaim = 0;
                 } else {
                     active.ticksOutsideClaim++;
 
                     if (active.ticksOutsideClaim > OUT_OF_CLAIM_TIMEOUT_TICKS) {
-                        player.sendMessage(net.minecraft.text.Text.literal(
-                                "Visualização da área protegida desativada por você ficar muito tempo fora dela."),
-                                false);
+                        player.sendSystemMessage(Component.literal(
+                                "Visualização da área protegida desativada por você ficar muito tempo fora dela."));
                         iterator.remove();
                         continue;
                     }
@@ -61,9 +60,9 @@ public class ClaimVisualizationManager {
                 active.ticksUntilNextRender--;
 
                 if (active.ticksUntilNextRender <= 0) {
-                    net.minecraft.world.World playerWorld = player.getEntityWorld();
+                    Level playerWorld = player.level();
 
-                    if (playerWorld instanceof net.minecraft.server.world.ServerWorld serverWorld) {
+                    if (playerWorld instanceof ServerLevel serverWorld) {
                         ClaimVisualization.showClaimBounds(player, serverWorld, claim);
                     }
 
@@ -73,7 +72,7 @@ public class ClaimVisualizationManager {
         });
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            activeVisualizations.remove(handler.player.getUuid());
+            activeVisualizations.remove(handler.player.getUUID());
         });
     }
 

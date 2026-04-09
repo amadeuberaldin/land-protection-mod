@@ -1,6 +1,6 @@
 package com.amadeu.landprotection.claim;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 import java.util.HashMap;
 import java.util.Map;

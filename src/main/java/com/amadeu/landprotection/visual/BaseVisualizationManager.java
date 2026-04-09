@@ -4,7 +4,7 @@ import com.amadeu.landprotection.claim.BaseClaim;
 import com.amadeu.landprotection.claim.ClaimManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,7 +27,7 @@ public class BaseVisualizationManager {
                 UUID playerUuid = entry.getKey();
                 ActiveVisualization active = entry.getValue();
 
-                ServerPlayerEntity player = server.getPlayerManager().getPlayer(playerUuid);
+                ServerPlayer player = server.getPlayerList().getPlayer(playerUuid);
 
                 if (player == null) {
                     iterator.remove();
@@ -41,14 +41,14 @@ public class BaseVisualizationManager {
                     continue;
                 }
 
-                if (base.contains(player.getBlockPos())) {
+                if (base.contains(player.blockPosition())) {
                     active.ticksOutsideBase = 0;
                 } else {
                     active.ticksOutsideBase++;
 
                     if (active.ticksOutsideBase > OUT_OF_BASE_TIMEOUT_TICKS) {
-                        player.sendMessage(
-                                net.minecraft.text.Text.literal(
+                        player.sendSystemMessage(
+                                net.minecraft.network.chat.Component.literal(
                                         "Visualização da base desativada por você ficar muito tempo fora dela."),
                                 false);
                         iterator.remove();
@@ -58,10 +58,10 @@ public class BaseVisualizationManager {
 
                 active.ticksUntilNextRender--;
 
-                if (active.ticksUntilNextRender <= 0) {
-                    net.minecraft.world.World playerWorld = player.getEntityWorld();
+                if (active.ticksUntilNextRender <= 0) {player.level();
+                    net.minecraft.world.level.Level playerWorld = player.level();
 
-                    if (playerWorld instanceof net.minecraft.server.world.ServerWorld serverWorld) {
+                    if (playerWorld instanceof net.minecraft.server.level.ServerLevel serverWorld) {
                         // Reaproveita o mesmo visualizador usando os limites da base
                         com.amadeu.landprotection.claim.Claim fakeClaim = new com.amadeu.landprotection.claim.Claim(
                                 base.getLeader(),
@@ -78,7 +78,7 @@ public class BaseVisualizationManager {
         });
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            activeVisualizations.remove(handler.player.getUuid());
+            activeVisualizations.remove(handler.player.getUUID());
         });
     }
 

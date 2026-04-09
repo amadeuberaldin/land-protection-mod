@@ -2,36 +2,36 @@ package com.amadeu.landprotection.event;
 
 import com.amadeu.landprotection.claim.ClaimManager;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
-import net.minecraft.item.Items;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.item.Items;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.core.BlockPos;
 
 public class FluidProtectionHandler {
 
     public static void register() {
         UseItemCallback.EVENT.register((player, world, hand) -> {
-            var stack = player.getStackInHand(hand);
+            var stack = player.getItemInHand(hand);
 
             if (stack.getItem() != Items.LAVA_BUCKET && stack.getItem() != Items.WATER_BUCKET) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
-            HitResult hit = player.raycast(5.0, 0.0F, false);
+            HitResult hit = player.pick(5.0, 0.0F, false);
             if (!(hit instanceof BlockHitResult blockHit)) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
-            BlockPos targetPos = blockHit.getBlockPos().offset(blockHit.getSide());
+            BlockPos targetPos = blockHit.getBlockPos().relative(blockHit.getDirection());
 
-            if (!ClaimManager.canInteract(player.getUuid(), targetPos)) {
-                player.sendMessage(Text.literal("Você não pode despejar líquidos nesta área protegida."), true);
-                return ActionResult.FAIL;
+            if (!ClaimManager.canInteract(player.getUUID(), targetPos)) {
+                player.sendSystemMessage(Component.literal("Você não pode despejar líquidos nesta área protegida."));
+                return InteractionResult.FAIL;
             }
 
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
     }
 }

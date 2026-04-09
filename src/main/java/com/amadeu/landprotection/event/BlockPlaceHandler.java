@@ -2,59 +2,59 @@ package com.amadeu.landprotection.event;
 
 import com.amadeu.landprotection.claim.ClaimManager;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.minecraft.block.*;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 public class BlockPlaceHandler {
 
     public static void register() {
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            ItemStack heldStack = player.getStackInHand(hand);
+            ItemStack heldStack = player.getItemInHand(hand);
 
             if (!(heldStack.getItem() instanceof BlockItem blockItem)) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
-            Direction side = hitResult.getSide();
-            BlockPos placedPos = hitResult.getBlockPos().offset(side);
+            Direction side = hitResult.getDirection();
+            BlockPos placedPos = hitResult.getBlockPos().relative(side);
             Block block = blockItem.getBlock();
 
-            if (!world.isClient()) {
-                if (!ClaimManager.canInteract(player.getUuid(), placedPos)) {
-                    return ActionResult.FAIL;
+            if (!world.isClientSide()) {
+                if (!ClaimManager.canInteract(player.getUUID(), placedPos)) {
+                    return InteractionResult.FAIL;
                 }
 
                 if (ClaimManager.getClaimAt(placedPos) == null) {
                     if (isChestLike(block)) {
-                        if (ClaimManager.playerHasClaim(player.getUuid())) {
-                            player.sendMessage(Text.literal("Este baú não está numa área protegida."), true);
+                        if (ClaimManager.playerHasClaim(player.getUUID())) {
+                            player.sendSystemMessage(Component.literal("Este baú não está numa área protegida."));
                         } else {
-                            player.sendMessage(Text.literal("Este baú não está numa área protegida, considere criar uma área protegida."), true);
+                            player.sendSystemMessage(Component.literal("Este baú não está numa área protegida, considere criar uma área protegida."));
                         }
                     } else if (block instanceof BedBlock) {
-                        if (ClaimManager.playerHasClaim(player.getUuid())) {
-                            player.sendMessage(Text.literal("Esta cama não está numa área protegida."), true);
+                        if (ClaimManager.playerHasClaim(player.getUUID())) {
+                            player.sendSystemMessage(Component.literal("Esta cama não está numa área protegida."));
                         } else {
-                            player.sendMessage(Text.literal("Esta cama não está numa área protegida, considere criar uma área protegida."), true);
+                            player.sendSystemMessage(Component.literal("Esta cama não está numa área protegida, considere criar uma área protegida."));
                         }
                     } else if (isWorkstation(block)) {
                         String nome = getDisplayName(block);
 
-                        if (ClaimManager.playerHasClaim(player.getUuid())) {
-                            player.sendMessage(Text.literal("Esta " + nome + " não está numa área protegida."), true);
+                        if (ClaimManager.playerHasClaim(player.getUUID())) {
+                            player.sendSystemMessage(Component.literal("Esta " + nome + " não está numa área protegida."));
                         } else {
-                            player.sendMessage(Text.literal("Esta " + nome + " não está numa área protegida, considere criar uma área protegida."), true);
+                            player.sendSystemMessage(Component.literal("Esta " + nome + " não está numa área protegida, considere criar uma área protegida."));
                         }
                     }
                 }
             }
 
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
     }
 

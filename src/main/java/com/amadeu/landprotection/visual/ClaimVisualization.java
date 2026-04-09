@@ -1,14 +1,14 @@
 package com.amadeu.landprotection.visual;
 
 import com.amadeu.landprotection.claim.Claim;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
 
 public class ClaimVisualization {
 
-    public static void showClaimBounds(ServerPlayerEntity player, ServerWorld world, Claim claim) {
+    public static void showClaimBounds(ServerPlayer player, ServerLevel world, Claim claim) {
         BlockPos pos1 = claim.getPos1();
         BlockPos pos2 = claim.getPos2();
 
@@ -38,10 +38,10 @@ public class ClaimVisualization {
         drawHorizontalZLine(player, world, minZ, maxZ, maxY, maxX);
     }
 
-    private static void drawVerticalLine(ServerPlayerEntity player, ServerWorld world, int x, int minY, int z,
+    private static void drawVerticalLine(ServerPlayer player, ServerLevel world, int x, int minY, int z,
             int maxY) {
         for (int y = minY; y <= maxY; y++) {
-            world.spawnParticles(
+            world.sendParticles(
                     player,
                     ParticleTypes.END_ROD,
                     false,
@@ -53,10 +53,10 @@ public class ClaimVisualization {
         }
     }
 
-    private static void drawHorizontalXLine(ServerPlayerEntity player, ServerWorld world, int minX, int maxX, int y,
+    private static void drawHorizontalXLine(ServerPlayer player, ServerLevel world, int minX, int maxX, int y,
             int z) {
         for (int x = minX; x <= maxX; x++) {
-            world.spawnParticles(
+            world.sendParticles(
                     player,
                     ParticleTypes.END_ROD,
                     false,
@@ -68,10 +68,10 @@ public class ClaimVisualization {
         }
     }
 
-    private static void drawHorizontalZLine(ServerPlayerEntity player, ServerWorld world, int minZ, int maxZ, int y,
+    private static void drawHorizontalZLine(ServerPlayer player, ServerLevel world, int minZ, int maxZ, int y,
             int x) {
         for (int z = minZ; z <= maxZ; z++) {
-            world.spawnParticles(
+            world.sendParticles(
                     player,
                     ParticleTypes.END_ROD,
                     false,

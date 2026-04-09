@@ -7,8 +7,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.WorldSavePath;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -85,7 +84,8 @@ public class ClaimStorage {
         }
 
         try (Reader reader = Files.newBufferedReader(file)) {
-            Type type = new TypeToken<StorageData>() {}.getType();
+            Type type = new TypeToken<StorageData>() {
+            }.getType();
             StorageData data = GSON.fromJson(reader, type);
 
             if (data == null) {
@@ -99,8 +99,7 @@ public class ClaimStorage {
                             owner,
                             fromPosData(claimData.pos1),
                             fromPosData(claimData.pos2),
-                            fromPosData(claimData.center)
-                    );
+                            fromPosData(claimData.center));
 
                     if (claimData.trustedPlayers != null) {
                         for (Map.Entry<String, String> entry : claimData.trustedPlayers.entrySet()) {
@@ -122,8 +121,7 @@ public class ClaimStorage {
                             leaderName,
                             fromPosData(baseData.pos1),
                             fromPosData(baseData.pos2),
-                            fromPosData(baseData.center)
-                    );
+                            fromPosData(baseData.center));
 
                     if (baseData.members != null) {
                         for (Map.Entry<String, String> entry : baseData.members.entrySet()) {
@@ -145,7 +143,8 @@ public class ClaimStorage {
     }
 
     private static Path getStorageFile(MinecraftServer server) {
-        return server.getSavePath(WorldSavePath.ROOT)
+        return server.getServerDirectory()
+                .resolve("world")
                 .resolve(STORAGE_DIR)
                 .resolve(STORAGE_FILE);
     }

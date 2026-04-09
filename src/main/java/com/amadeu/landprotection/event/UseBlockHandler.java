@@ -4,10 +4,10 @@ import com.amadeu.landprotection.claim.BaseClaim;
 import com.amadeu.landprotection.claim.Claim;
 import com.amadeu.landprotection.claim.ClaimManager;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.minecraft.block.*;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.level.block.*;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
 
 public class UseBlockHandler {
 
@@ -15,15 +15,15 @@ public class UseBlockHandler {
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
             Block block = world.getBlockState(hitResult.getBlockPos()).getBlock();
 
-            if (!ClaimManager.canInteract(player.getUuid(), hitResult.getBlockPos())) {
+            if (!ClaimManager.canInteract(player.getUUID(), hitResult.getBlockPos())) {
                 String ownerName = "outro jogador";
 
                 Claim claim = ClaimManager.getClaimAt(hitResult.getBlockPos());
                 if (claim != null) {
-                    if (!world.isClient()) {
+                    if (!world.isClientSide()) {
                         var server = world.getServer();
                         if (server != null) {
-                            ServerPlayerEntity owner = server.getPlayerManager().getPlayer(claim.getOwner());
+                            ServerPlayer owner = server.getPlayerList().getPlayer(claim.getOwner());
                             if (owner != null) {
                                 ownerName = owner.getName().getString();
                             }
@@ -31,26 +31,24 @@ public class UseBlockHandler {
                     }
 
                     if (isDoorLike(block)) {
-                        player.sendMessage(
-                                Text.literal("Esta porta ou mecanismo pertence à área de " + ownerName + "."),
-                                true
+                        player.sendSystemMessage(
+                                Component.literal("Esta porta ou mecanismo pertence à área de " + ownerName + ".")
                         );
                     } else {
-                        player.sendMessage(
-                                Text.literal("Esta área pertence a " + ownerName + ", peça autorização para utilizar."),
-                                true
+                        player.sendSystemMessage(
+                                Component.literal("Esta área pertence a " + ownerName + ", peça autorização para utilizar.")
                         );
                     }
 
-                    return ActionResult.FAIL;
+                    return InteractionResult.FAIL;
                 }
 
                 BaseClaim base = ClaimManager.getBaseAt(hitResult.getBlockPos());
                 if (base != null) {
-                    if (!world.isClient()) {
+                    if (!world.isClientSide()) {
                         var server = world.getServer();
                         if (server != null) {
-                            ServerPlayerEntity leader = server.getPlayerManager().getPlayer(base.getLeader());
+                            ServerPlayer leader = server.getPlayerList().getPlayer(base.getLeader());
                             if (leader != null) {
                                 ownerName = leader.getName().getString();
                             }
@@ -58,18 +56,16 @@ public class UseBlockHandler {
                     }
 
                     if (isDoorLike(block)) {
-                        player.sendMessage(
-                                Text.literal("Esta porta ou mecanismo pertence à base liderada por " + ownerName + "."),
-                                true
+                        player.sendSystemMessage(
+                                Component.literal("Esta porta ou mecanismo pertence à base liderada por " + ownerName + ".")
                         );
                     } else {
-                        player.sendMessage(
-                                Text.literal("Esta base pertence ao grupo liderado por " + ownerName + "."),
-                                true
+                        player.sendSystemMessage(
+                                Component.literal("Esta base pertence ao grupo liderado por " + ownerName + ".")
                         );
                     }
 
-                    return ActionResult.FAIL;
+                    return InteractionResult.FAIL;
                 }
             }
 
@@ -78,38 +74,35 @@ public class UseBlockHandler {
 
             if (claim == null && base == null) {
                 if (isChestLike(block)) {
-                    if (ClaimManager.playerHasClaim(player.getUuid()) || ClaimManager.playerHasBase(player.getUuid())) {
-                        player.sendMessage(Text.literal("Este baú não está numa área protegida."), true);
+                    if (ClaimManager.playerHasClaim(player.getUUID()) || ClaimManager.playerHasBase(player.getUUID())) {
+                        player.sendSystemMessage(Component.literal("Este baú não está numa área protegida."));
                     } else {
-                        player.sendMessage(
-                                Text.literal("Este baú não está numa área protegida, considere criar uma área protegida."),
-                                true
+                        player.sendSystemMessage(
+                                Component.literal("Este baú não está numa área protegida, considere criar uma área protegida.")
                         );
                     }
                 } else if (block instanceof BedBlock) {
-                    if (ClaimManager.playerHasClaim(player.getUuid()) || ClaimManager.playerHasBase(player.getUuid())) {
-                        player.sendMessage(Text.literal("Esta cama não está numa área protegida."), true);
+                    if (ClaimManager.playerHasClaim(player.getUUID()) || ClaimManager.playerHasBase(player.getUUID())) {
+                        player.sendSystemMessage(Component.literal("Esta cama não está numa área protegida."));
                     } else {
-                        player.sendMessage(
-                                Text.literal("Esta cama não está numa área protegida, considere criar uma área protegida."),
-                                true
+                        player.sendSystemMessage(
+                                Component.literal("Esta cama não está numa área protegida, considere criar uma área protegida.")
                         );
                     }
                 } else if (isWorkstation(block)) {
                     String nome = getDisplayName(block);
 
-                    if (ClaimManager.playerHasClaim(player.getUuid()) || ClaimManager.playerHasBase(player.getUuid())) {
-                        player.sendMessage(Text.literal("Esta " + nome + " não está numa área protegida."), true);
+                    if (ClaimManager.playerHasClaim(player.getUUID()) || ClaimManager.playerHasBase(player.getUUID())) {
+                        player.sendSystemMessage(Component.literal("Esta " + nome + " não está numa área protegida."));
                     } else {
-                        player.sendMessage(
-                                Text.literal("Esta " + nome + " não está numa área protegida, considere criar uma área protegida."),
-                                true
+                        player.sendSystemMessage(
+                                Component.literal("Esta " + nome + " não está numa área protegida, considere criar uma área protegida.")
                         );
                     }
                 }
             }
 
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
     }
 
@@ -122,7 +115,7 @@ public class UseBlockHandler {
 
     private static boolean isDoorLike(Block block) {
         return block instanceof DoorBlock
-                || block instanceof TrapdoorBlock
+                || block instanceof TrapDoorBlock
                 || block instanceof FenceGateBlock
                 || block == Blocks.LEVER
                 || block instanceof ButtonBlock;
