@@ -9,14 +9,12 @@ import java.util.UUID;
 
 public class ClaimManager {
 
-    public static final int MAX_BASE_MEMBERS = 5;
+    public static final int MAX_CLAIMS_PER_PLAYER = 4;
 
     private static final List<Claim> claims = new ArrayList<>();
-    private static final List<BaseClaim> bases = new ArrayList<>();
 
-    // =========================
-    // Claims individuais
-    // =========================
+    private ClaimManager() {
+    }
 
     public static void addClaim(Claim claim) {
         claims.add(claim);
@@ -26,34 +24,64 @@ public class ClaimManager {
         claims.remove(claim);
     }
 
-    public static void removeClaimByOwner(UUID playerUuid) {
+    public static void removeClaimsByOwner(UUID playerUuid) {
         claims.removeIf(claim -> claim.getOwner().equals(playerUuid));
     }
 
     public static boolean playerHasClaim(UUID playerUuid) {
-        return getClaimByPlayer(playerUuid) != null;
+        return playerClaimCount(playerUuid) > 0;
     }
 
-    public static Claim getClaimByPlayer(UUID playerUuid) {
+    public static int playerClaimCount(UUID playerUuid) {
+        int count = 0;
+
         for (Claim claim : claims) {
             if (claim.getOwner().equals(playerUuid)) {
-                return claim;
+                count++;
             }
         }
-        return null;
+
+        return count;
     }
 
-    public static Claim getClaimAt(BlockPos pos) {
+    public static boolean canCreateClaim(UUID playerUuid) {
+        return playerClaimCount(playerUuid) < MAX_CLAIMS_PER_PLAYER;
+    }
+
+    public static List<Claim> getClaimsByPlayer(UUID playerUuid) {
+        List<Claim> ownedClaims = new ArrayList<>();
+
         for (Claim claim : claims) {
-            if (claim.contains(pos)) {
+            if (claim.getOwner().equals(playerUuid)) {
+                ownedClaims.add(claim);
+            }
+        }
+
+        return ownedClaims;
+    }
+
+    public static Claim getClaimAt(BlockPos pos, String dimension) {
+        for (Claim claim : claims) {
+            if (claim.contains(pos, dimension)) {
                 return claim;
             }
         }
+
         return null;
     }
 
-    public static boolean hasClaimAt(BlockPos pos) {
-        return getClaimAt(pos) != null;
+    public static Claim getClaimAtOwnedBy(UUID playerUuid, BlockPos pos, String dimension) {
+        for (Claim claim : claims) {
+            if (claim.getOwner().equals(playerUuid) && claim.contains(pos, dimension)) {
+                return claim;
+            }
+        }
+
+        return null;
+    }
+
+    public static boolean hasClaimAt(BlockPos pos, String dimension) {
+        return getClaimAt(pos, dimension) != null;
     }
 
     public static List<Claim> getClaims() {
@@ -64,92 +92,23 @@ public class ClaimManager {
         claims.clear();
     }
 
-    // =========================
-    // Bases em grupo
-    // =========================
+    public static boolean canInteract(UUID playerUuid, BlockPos pos, String dimension) {
+        Claim claim = getClaimAt(pos, dimension);
 
-    public static void addBase(BaseClaim base) {
-        bases.add(base);
-    }
-
-    public static void removeBase(BaseClaim base) {
-        bases.remove(base);
-    }
-
-    public static BaseClaim getBaseByLeader(UUID playerUuid) {
-        for (BaseClaim base : bases) {
-            if (base.getLeader().equals(playerUuid)) {
-                return base;
-            }
-        }
-        return null;
-    }
-
-    public static BaseClaim getBaseByMember(UUID playerUuid) {
-        for (BaseClaim base : bases) {
-            if (base.isMember(playerUuid)) {
-                return base;
-            }
-        }
-        return null;
-    }
-
-    public static BaseClaim getBaseAt(BlockPos pos) {
-        for (BaseClaim base : bases) {
-            if (base.contains(pos)) {
-                return base;
-            }
-        }
-        return null;
-    }
-
-    public static boolean hasBaseAt(BlockPos pos) {
-        return getBaseAt(pos) != null;
-    }
-
-    public static boolean playerHasBase(UUID playerUuid) {
-        return getBaseByMember(playerUuid) != null;
-    }
-
-    public static List<BaseClaim> getBases() {
-        return Collections.unmodifiableList(bases);
-    }
-
-    public static void clearBases() {
-        bases.clear();
-    }
-
-    // =========================
-    // Permissões
-    // =========================
-
-    public static boolean canInteract(UUID playerUuid, BlockPos pos) {
-        Claim claim = getClaimAt(pos);
         if (claim != null) {
             return claim.canInteract(playerUuid);
-        }
-
-        BaseClaim base = getBaseAt(pos);
-        if (base != null) {
-            return base.canInteract(playerUuid);
         }
 
         return true;
     }
 
-    // =========================
-    // Anti-overlap
-    // =========================
-
-    public static boolean overlapsExistingArea(BlockPos pos1, BlockPos pos2) {
+    public static boolean overlapsExistingArea(BlockPos pos1, BlockPos pos2, String dimension) {
         for (Claim claim : claims) {
-            if (boxesOverlap(pos1, pos2, claim.getPos1(), claim.getPos2())) {
-                return true;
+            if (!claim.getDimension().equals(dimension)) {
+                continue;
             }
-        }
 
-        for (BaseClaim base : bases) {
-            if (boxesOverlap(pos1, pos2, base.getPos1(), base.getPos2())) {
+            if (boxesOverlap(pos1, pos2, claim.getPos1(), claim.getPos2())) {
                 return true;
             }
         }

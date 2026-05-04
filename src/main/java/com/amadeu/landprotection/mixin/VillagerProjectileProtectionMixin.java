@@ -17,6 +17,7 @@ public abstract class VillagerProjectileProtectionMixin {
 
     @Inject(method = "onHitEntity", at = @At("HEAD"), cancellable = true)
     private void protectVillagerFromArrow(EntityHitResult hitResult, CallbackInfo ci) {
+
         Entity target = hitResult.getEntity();
 
         if (!(target instanceof Villager villager)) {
@@ -26,13 +27,16 @@ public abstract class VillagerProjectileProtectionMixin {
         Projectile projectile = (Projectile) (Object) this;
         Entity owner = projectile.getOwner();
 
-        // Só bloqueia projétil disparado por jogador
         if (!(owner instanceof Player player)) {
             return;
         }
 
-        if (!ClaimManager.canInteract(player.getUUID(), villager.blockPosition())) {
-            player.sendSystemMessage(Component.literal("Este villager está protegido nesta área privada."));
+        String dimension = villager.level().dimension().toString();
+
+        if (!ClaimManager.canInteract(player.getUUID(), villager.blockPosition(), dimension)) {
+            player.sendSystemMessage(
+                    Component.literal("Este villager está protegido nesta área privada.")
+            );
             ci.cancel();
         }
     }

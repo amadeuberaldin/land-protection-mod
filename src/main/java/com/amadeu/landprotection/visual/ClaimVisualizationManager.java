@@ -1,7 +1,6 @@
 package com.amadeu.landprotection.visual;
 
 import com.amadeu.landprotection.claim.Claim;
-import com.amadeu.landprotection.claim.ClaimManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.network.chat.Component;
@@ -37,21 +36,22 @@ public class ClaimVisualizationManager {
                     continue;
                 }
 
-                Claim claim = ClaimManager.getClaimByPlayer(playerUuid);
+                Claim claim = active.claim;
 
                 if (claim == null) {
                     iterator.remove();
                     continue;
                 }
 
-                if (claim.contains(player.blockPosition())) {
+                if (claim.contains(player.blockPosition(), player.level().dimension().toString())) {
                     active.ticksOutsideClaim = 0;
                 } else {
                     active.ticksOutsideClaim++;
 
                     if (active.ticksOutsideClaim > OUT_OF_CLAIM_TIMEOUT_TICKS) {
                         player.sendSystemMessage(Component.literal(
-                                "Visualização da área protegida desativada por você ficar muito tempo fora dela."));
+                                "Visualização da claim desativada por você ficar muito tempo fora dela."
+                        ));
                         iterator.remove();
                         continue;
                     }
@@ -76,19 +76,45 @@ public class ClaimVisualizationManager {
         });
     }
 
-    public static boolean isShowing(UUID playerUuid) {
-        return activeVisualizations.containsKey(playerUuid);
+    public static boolean isShowing(UUID playerUuid, Claim claim) {
+        ActiveVisualization active = activeVisualizations.get(playerUuid);
+
+        if (active == null || active.claim == null || claim == null) {
+            return false;
+        }
+
+        return sameClaim(active.claim, claim);
     }
 
-    public static void show(UUID playerUuid) {
-        activeVisualizations.put(playerUuid, new ActiveVisualization());
+    public static void show(UUID playerUuid, Claim claim) {
+        ActiveVisualization active = new ActiveVisualization();
+        active.claim = claim;
+        active.ticksOutsideClaim = 0;
+        active.ticksUntilNextRender = 0;
+        activeVisualizations.put(playerUuid, active);
     }
 
-    public static void hide(UUID playerUuid) {
-        activeVisualizations.remove(playerUuid);
+    public static void hide(UUID playerUuid, Claim claim) {
+        ActiveVisualization active = activeVisualizations.get(playerUuid);
+
+        if (active == null || active.claim == null || claim == null) {
+            return;
+        }
+
+        if (sameClaim(active.claim, claim)) {
+            activeVisualizations.remove(playerUuid);
+        }
+    }
+
+    private static boolean sameClaim(Claim a, Claim b) {
+        return a.getOwner().equals(b.getOwner())
+                && a.getCenter().equals(b.getCenter())
+                && a.getPos1().equals(b.getPos1())
+                && a.getPos2().equals(b.getPos2());
     }
 
     private static class ActiveVisualization {
+        private Claim claim;
         private int ticksOutsideClaim = 0;
         private int ticksUntilNextRender = 0;
     }

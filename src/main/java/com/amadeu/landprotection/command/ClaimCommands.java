@@ -14,14 +14,15 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 public class ClaimCommands {
 
-    private static final int CLAIM_RADIUS_XZ = 10;
-    private static final int CLAIM_RADIUS_Y_DOWN = 10;
-    private static final int CLAIM_RADIUS_Y_UP = 10;
+    private static final int CLAIM_RADIUS_XZ = 30;
+    private static final int CLAIM_RADIUS_Y_DOWN = 15;
+    private static final int CLAIM_RADIUS_Y_UP = 15;
 
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -52,10 +53,19 @@ public class ClaimCommands {
 
                             BlockPos centerPos = player.blockPosition();
                             Level world = source.getLevel();
+                            String dimension = world.dimension().toString();
 
-                            if (ClaimManager.playerHasClaim(player.getUUID())) {
+                            if (!ClaimManager.canCreateClaim(player.getUUID())) {
                                 player.sendSystemMessage(Component.literal(
-                                        "Você já possui uma área protegida. Use /disclaim antes de criar outra."));
+                                        "Você já atingiu o limite de " + ClaimManager.MAX_CLAIMS_PER_PLAYER
+                                                + " claims."));
+                                return 0;
+                            }
+
+                            if (
+        ClaimManager.getClaimAt(centerPos, dimension) != null) {
+                                player.sendSystemMessage(Component.literal(
+                                        "Você já está dentro de uma área protegida. Vá para outro local."));
                                 return 0;
                             }
 
@@ -68,20 +78,22 @@ public class ClaimCommands {
                             BlockPos pos1 = centerPos.offset(-CLAIM_RADIUS_XZ, -CLAIM_RADIUS_Y_DOWN, -CLAIM_RADIUS_XZ);
                             BlockPos pos2 = centerPos.offset(CLAIM_RADIUS_XZ, CLAIM_RADIUS_Y_UP, CLAIM_RADIUS_XZ);
 
-                            if (ClaimManager.overlapsExistingArea(pos1, pos2)) {
+                            if (ClaimManager.overlapsExistingArea(pos1, pos2, dimension)) {
                                 player.sendSystemMessage(Component.literal(
                                         "Não é possível criar a claim aqui porque ela sobrepõe outra área protegida."));
                                 return 0;
                             }
 
-                            Claim claim = new Claim(player.getUUID(), pos1, pos2, centerPos);
+                            Claim claim = new Claim(player.getUUID(), pos1, pos2, centerPos, dimension);
                             ClaimManager.addClaim(claim);
 
+                            int total = ClaimManager.playerClaimCount(player.getUUID());
+
                             player.sendSystemMessage(Component.literal(
-                                    "Área protegida criada com sucesso no local atual."));
+                                    "Área protegida criada com sucesso. Você agora possui "
+                                            + total + "/" + ClaimManager.MAX_CLAIMS_PER_PLAYER + " claims."));
                             return 1;
-                        })
-        );
+                        }));
     }
 
     private static void registerDisclaimCommand(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -99,28 +111,22 @@ public class ClaimCommands {
                             }
 
                             BlockPos pos = player.blockPosition();
-                            Claim claim = ClaimManager.getClaimAt(pos);
+                            String dimension = source.getLevel().dimension().toString();
+                            Claim claim = ClaimManager.getClaimAtOwnedBy(player.getUUID(), pos, dimension);
 
                             if (claim == null) {
                                 player.sendSystemMessage(Component.literal(
-                                        "Você não está dentro de nenhuma área protegida individual."));
-                                return 0;
-                            }
-
-                            if (!claim.isOwner(player.getUUID())) {
-                                player.sendSystemMessage(Component.literal(
-                                        "Esta área protegida não pertence a você."));
+                                        "Você precisa estar dentro de uma claim sua para removê-la."));
                                 return 0;
                             }
 
                             ClaimManager.removeClaim(claim);
-                            ClaimVisualizationManager.hide(player.getUUID());
+                            ClaimVisualizationManager.hide(player.getUUID(), claim);
 
                             player.sendSystemMessage(Component.literal(
-                                    "Sua área protegida foi removida com sucesso."));
+                                    "A claim atual foi removida com sucesso."));
                             return 1;
-                        })
-        );
+                        }));
     }
 
     private static void registerClaimLocationCommand(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -137,25 +143,29 @@ public class ClaimCommands {
                                 return 0;
                             }
 
-                            Claim claim = ClaimManager.getClaimByPlayer(player.getUUID());
+                            List<Claim> claims = ClaimManager.getClaimsByPlayer(player.getUUID());
 
-                            if (claim == null) {
-                                player.sendSystemMessage(Component.literal("Você não possui uma área protegida."));
+                            if (claims.isEmpty()) {
+                                player.sendSystemMessage(Component.literal("Você não possui nenhuma área protegida."));
                                 return 0;
                             }
 
-                            BlockPos center = claim.getCenter();
                             player.sendSystemMessage(Component.literal(
-                                    "Sua área protegida foi criada em X: "
-                                            + center.getX()
-                                            + " Y: "
-                                            + center.getY()
-                                            + " Z: "
-                                            + center.getZ()
-                                            + "."));
+                                    "Suas claims (" + claims.size() + "/" + ClaimManager.MAX_CLAIMS_PER_PLAYER + "):"));
+
+                            int index = 1;
+                            for (Claim claim : claims) {
+                                BlockPos center = claim.getCenter();
+                                player.sendSystemMessage(Component.literal(
+                                        "#" + index
+                                                + " - X: " + center.getX()
+                                                + " Y: " + center.getY()
+                                                + " Z: " + center.getZ()));
+                                index++;
+                            }
+
                             return 1;
-                        })
-        );
+                        }));
     }
 
     private static void registerTrustListCommand(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -172,10 +182,12 @@ public class ClaimCommands {
                                 return 0;
                             }
 
-                            Claim claim = ClaimManager.getClaimByPlayer(player.getUUID());
+                            String dimension = source.getLevel().dimension().toString();
+                            Claim claim = ClaimManager.getClaimAtOwnedBy(player.getUUID(), player.blockPosition(), dimension);
 
                             if (claim == null) {
-                                player.sendSystemMessage(Component.literal("Você não possui uma área protegida."));
+                                player.sendSystemMessage(Component.literal(
+                                        "Você precisa estar dentro de uma claim sua para ver a trustlist."));
                                 return 0;
                             }
 
@@ -183,7 +195,7 @@ public class ClaimCommands {
 
                             if (trustedPlayers.isEmpty()) {
                                 player.sendSystemMessage(Component.literal(
-                                        "Nenhum jogador possui permissão na sua área protegida."));
+                                        "Nenhum jogador possui permissão nesta claim."));
                                 return 1;
                             }
 
@@ -198,10 +210,9 @@ public class ClaimCommands {
                                 first = false;
                             }
 
-                            player.sendSystemMessage(Component.literal("Jogadores com permissão: " + list));
+                            player.sendSystemMessage(Component.literal("Jogadores com permissão nesta claim: " + list));
                             return 1;
-                        })
-        );
+                        }));
     }
 
     private static void registerTrustCommand(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -215,49 +226,48 @@ public class ClaimCommands {
                                     try {
                                         owner = source.getPlayerOrException();
                                     } catch (Exception e) {
-                                        source.sendFailure(Component.literal("Este comando só pode ser usado por jogadores."));
+                                        source.sendFailure(
+                                                Component.literal("Este comando só pode ser usado por jogadores."));
                                         return 0;
                                     }
 
                                     String playerName = StringArgumentType.getString(context, "jogador");
-                                    Claim claim = ClaimManager.getClaimByPlayer(owner.getUUID());
+                                    String dimension = source.getLevel().dimension().toString();
+                                    Claim claim = ClaimManager.getClaimAtOwnedBy(owner.getUUID(),
+                                            owner.blockPosition(), dimension);
 
                                     if (claim == null) {
-                                        owner.sendSystemMessage(Component.literal("Você não possui uma área protegida."));
+                                        owner.sendSystemMessage(Component.literal(
+                                                "Você precisa estar dentro de uma claim sua para usar /trust."));
                                         return 0;
                                     }
 
                                     ResolvedPlayer resolved = resolvePlayer(source.getServer(), playerName);
                                     if (resolved == null) {
-                                        owner.sendSystemMessage(Component.literal("Jogador não encontrado ou offline."));
+                                        owner.sendSystemMessage(
+                                                Component.literal("Jogador não encontrado ou offline."));
                                         return 0;
                                     }
 
                                     if (resolved.uuid().equals(owner.getUUID())) {
-                                        owner.sendSystemMessage(Component.literal("Você já é o dono da sua área."));
-                                        return 0;
-                                    }
-
-                                    if (ClaimManager.playerHasBase(resolved.uuid())) {
-                                        owner.sendSystemMessage(Component.literal(
-                                                "O jogador informado participa de uma base e não pode ser trusted na claim individual."));
+                                        owner.sendSystemMessage(Component.literal("Você já é o dono desta claim."));
                                         return 0;
                                     }
 
                                     claim.trustPlayer(resolved.uuid(), resolved.name());
                                     owner.sendSystemMessage(Component.literal(
-                                            "Permissão concedida para " + resolved.name() + "."));
+                                            "Permissão concedida para " + resolved.name() + " nesta claim."));
 
-                                    ServerPlayer onlineTrusted = source.getServer().getPlayerList().getPlayerByName(resolved.name());
+                                    ServerPlayer onlineTrusted = source.getServer().getPlayerList()
+                                            .getPlayerByName(resolved.name());
                                     if (onlineTrusted != null) {
                                         onlineTrusted.sendSystemMessage(Component.literal(
-                                                "Você recebeu permissão para usar a área protegida de "
+                                                "Você recebeu permissão para usar uma claim de "
                                                         + owner.getName().getString() + "."));
                                     }
 
                                     return 1;
-                                }))
-        );
+                                })));
     }
 
     private static void registerUntrustCommand(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -271,38 +281,43 @@ public class ClaimCommands {
                                     try {
                                         owner = source.getPlayerOrException();
                                     } catch (Exception e) {
-                                        source.sendFailure(Component.literal("Este comando só pode ser usado por jogadores."));
+                                        source.sendFailure(
+                                                Component.literal("Este comando só pode ser usado por jogadores."));
                                         return 0;
                                     }
 
                                     String playerName = StringArgumentType.getString(context, "jogador");
-                                    Claim claim = ClaimManager.getClaimByPlayer(owner.getUUID());
+                                    String dimension = source.getLevel().dimension().toString();
+                                    Claim claim = ClaimManager.getClaimAtOwnedBy(owner.getUUID(),
+                                            owner.blockPosition(), dimension);
 
                                     if (claim == null) {
-                                        owner.sendSystemMessage(Component.literal("Você não possui uma área protegida."));
+                                        owner.sendSystemMessage(Component.literal(
+                                                "Você precisa estar dentro de uma claim sua para usar /untrust."));
                                         return 0;
                                     }
 
                                     ResolvedPlayer resolved = resolvePlayer(source.getServer(), playerName);
                                     if (resolved == null) {
-                                        owner.sendSystemMessage(Component.literal("Jogador não encontrado ou offline."));
+                                        owner.sendSystemMessage(
+                                                Component.literal("Jogador não encontrado ou offline."));
                                         return 0;
                                     }
 
                                     claim.untrustPlayer(resolved.uuid());
                                     owner.sendSystemMessage(Component.literal(
-                                            "Permissão removida de " + resolved.name() + "."));
+                                            "Permissão removida de " + resolved.name() + " nesta claim."));
 
-                                    ServerPlayer onlineTrusted = source.getServer().getPlayerList().getPlayerByName(resolved.name());
+                                    ServerPlayer onlineTrusted = source.getServer().getPlayerList()
+                                            .getPlayerByName(resolved.name());
                                     if (onlineTrusted != null) {
                                         onlineTrusted.sendSystemMessage(Component.literal(
-                                                "Sua permissão na área protegida de "
+                                                "Sua permissão em uma claim de "
                                                         + owner.getName().getString() + " foi removida."));
                                     }
 
                                     return 1;
-                                }))
-        );
+                                })));
     }
 
     private static void registerClaimShowCommand(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -319,18 +334,19 @@ public class ClaimCommands {
                                 return 0;
                             }
 
-                            Claim claim = ClaimManager.getClaimByPlayer(player.getUUID());
+                            String dimension = source.getLevel().dimension().toString();
+                            Claim claim = ClaimManager.getClaimAtOwnedBy(player.getUUID(), player.blockPosition(), dimension);
 
                             if (claim == null) {
-                                player.sendSystemMessage(Component.literal("Você não possui uma área protegida."));
+                                player.sendSystemMessage(Component.literal(
+                                        "Você precisa estar dentro de uma claim sua para usar /claimshow."));
                                 return 0;
                             }
 
-                            ClaimVisualizationManager.show(player.getUUID());
-                            player.sendSystemMessage(Component.literal("Visualização da claim ativada."));
+                            ClaimVisualizationManager.show(player.getUUID(), claim);
+                            player.sendSystemMessage(Component.literal("Visualização desta claim ativada."));
                             return 1;
-                        })
-        );
+                        }));
     }
 
     private static void registerClaimHideCommand(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -347,16 +363,25 @@ public class ClaimCommands {
                                 return 0;
                             }
 
-                            if (!ClaimVisualizationManager.isShowing(player.getUUID())) {
-                                player.sendSystemMessage(Component.literal("A visualização da claim já está desativada."));
+                            String dimension = source.getLevel().dimension().toString();
+                            Claim claim = ClaimManager.getClaimAtOwnedBy(player.getUUID(), player.blockPosition(), dimension);
+
+                            if (claim == null) {
+                                player.sendSystemMessage(Component.literal(
+                                        "Você precisa estar dentro de uma claim sua para usar /claimhide."));
                                 return 0;
                             }
 
-                            ClaimVisualizationManager.hide(player.getUUID());
-                            player.sendSystemMessage(Component.literal("Visualização da claim desativada."));
+                            if (!ClaimVisualizationManager.isShowing(player.getUUID(), claim)) {
+                                player.sendSystemMessage(
+                                        Component.literal("A visualização desta claim já está desativada."));
+                                return 0;
+                            }
+
+                            ClaimVisualizationManager.hide(player.getUUID(), claim);
+                            player.sendSystemMessage(Component.literal("Visualização desta claim desativada."));
                             return 1;
-                        })
-        );
+                        }));
     }
 
     private static ResolvedPlayer resolvePlayer(MinecraftServer server, String playerName) {
@@ -365,8 +390,7 @@ public class ClaimCommands {
         if (onlinePlayer != null) {
             return new ResolvedPlayer(
                     onlinePlayer.getUUID(),
-                    onlinePlayer.getName().getString()
-            );
+                    onlinePlayer.getName().getString());
         }
 
         return null;

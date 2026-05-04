@@ -13,6 +13,7 @@ public class FluidProtectionHandler {
 
     public static void register() {
         UseItemCallback.EVENT.register((player, world, hand) -> {
+
             var stack = player.getItemInHand(hand);
 
             if (stack.getItem() != Items.LAVA_BUCKET && stack.getItem() != Items.WATER_BUCKET) {
@@ -26,8 +27,12 @@ public class FluidProtectionHandler {
 
             BlockPos targetPos = blockHit.getBlockPos().relative(blockHit.getDirection());
 
-            if (!ClaimManager.canInteract(player.getUUID(), targetPos)) {
-                player.sendSystemMessage(Component.literal("Você não pode despejar líquidos nesta área protegida."));
+            String dimension = world.dimension().toString();
+
+            if (!ClaimManager.canInteract(player.getUUID(), targetPos, dimension)) {
+                player.sendSystemMessage(
+                        Component.literal("Você não pode despejar líquidos nesta área protegida.")
+                );
                 return InteractionResult.FAIL;
             }
 
