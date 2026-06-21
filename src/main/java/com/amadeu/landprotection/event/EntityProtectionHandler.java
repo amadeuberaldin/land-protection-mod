@@ -27,7 +27,8 @@ public class EntityProtectionHandler {
 
             String dimension = world.dimension().toString();
 
-            if (ClaimManager.canInteract(player.getUUID(), entity.blockPosition(), dimension)) {
+            if (player instanceof ServerPlayer serverPlayer
+                    && ClaimManager.canBuild(serverPlayer, entity.blockPosition(), dimension)) {
                 return InteractionResult.PASS;
             }
 
@@ -43,7 +44,8 @@ public class EntityProtectionHandler {
 
             String dimension = world.dimension().toString();
 
-            if (ClaimManager.canInteract(player.getUUID(), entity.blockPosition(), dimension)) {
+            if (player instanceof ServerPlayer serverPlayer
+                    && ClaimManager.canBuild(serverPlayer, entity.blockPosition(), dimension)) {
                 return InteractionResult.PASS;
             }
 
@@ -77,7 +79,6 @@ public class EntityProtectionHandler {
         }
 
         player.sendSystemMessage(
-                Component.literal("Esta entidade pertence à área de " + ownerName + ".")
-        );
+                Component.literal("Esta entidade pertence à área de " + ownerName + "."));
     }
 }

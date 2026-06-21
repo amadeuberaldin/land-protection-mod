@@ -25,7 +25,6 @@ public class ClaimStorage {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String STORAGE_DIR = "landprotection";
     private static final String STORAGE_FILE = "claims.json";
-    private static final String DEFAULT_DIMENSION = "minecraft:overworld";
 
     private ClaimStorage() {
     }
@@ -45,10 +44,23 @@ public class ClaimStorage {
                 claimData.pos1 = toPosData(claim.getPos1());
                 claimData.pos2 = toPosData(claim.getPos2());
                 claimData.center = toPosData(claim.getCenter());
-                claimData.trustedPlayers = new LinkedHashMap<>();
 
+                claimData.serverClaim = claim.isServerClaim();
+                claimData.arena = claim.isArena();
+
+                claimData.trustedPlayers = new LinkedHashMap<>();
                 for (Map.Entry<UUID, String> entry : claim.getTrustedPlayers().entrySet()) {
                     claimData.trustedPlayers.put(entry.getKey().toString(), entry.getValue());
+                }
+
+                claimData.guestPlayers = new LinkedHashMap<>();
+                for (Map.Entry<UUID, String> entry : claim.getGuestPlayers().entrySet()) {
+                    claimData.guestPlayers.put(entry.getKey().toString(), entry.getValue());
+                }
+
+                claimData.builders = new LinkedHashMap<>();
+                for (Map.Entry<UUID, String> entry : claim.getBuilders().entrySet()) {
+                    claimData.builders.put(entry.getKey().toString(), entry.getValue());
                 }
 
                 data.claims.add(claimData);
@@ -84,19 +96,36 @@ public class ClaimStorage {
 
             for (ClaimData claimData : data.claims) {
                 UUID owner = UUID.fromString(claimData.owner);
-                String dimension = claimData.dimension != null ? claimData.dimension : DEFAULT_DIMENSION;
+
+                String dimension = claimData.dimension != null
+                        ? claimData.dimension
+                        : "minecraft:overworld";
 
                 Claim claim = new Claim(
                         owner,
                         fromPosData(claimData.pos1),
                         fromPosData(claimData.pos2),
                         fromPosData(claimData.center),
-                        dimension
-                );
+                        dimension);
+
+                claim.setServerClaim(claimData.serverClaim);
+                claim.setArena(claimData.arena);
 
                 if (claimData.trustedPlayers != null) {
                     for (Map.Entry<String, String> entry : claimData.trustedPlayers.entrySet()) {
                         claim.trustPlayer(UUID.fromString(entry.getKey()), entry.getValue());
+                    }
+                }
+
+                if (claimData.guestPlayers != null) {
+                    for (Map.Entry<String, String> entry : claimData.guestPlayers.entrySet()) {
+                        claim.guestPlayer(UUID.fromString(entry.getKey()), entry.getValue());
+                    }
+                }
+
+                if (claimData.builders != null) {
+                    for (Map.Entry<String, String> entry : claimData.builders.entrySet()) {
+                        claim.addBuilder(UUID.fromString(entry.getKey()), entry.getValue());
                     }
                 }
 
@@ -138,6 +167,11 @@ public class ClaimStorage {
         private PosData pos2;
         private PosData center;
         private Map<String, String> trustedPlayers;
+        private Map<String, String> guestPlayers;
+        private Map<String, String> builders;
+
+        private boolean serverClaim;
+        private boolean arena;
     }
 
     private static class PosData {

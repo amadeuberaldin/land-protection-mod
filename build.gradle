@@ -32,11 +32,13 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 25
 }
 
+def modVersion = version
+
 processResources {
-    inputs.property "version", project.version
+    inputs.property "version", modVersion
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.version
+        expand "version": modVersion
     }
 }
 

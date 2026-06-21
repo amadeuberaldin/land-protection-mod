@@ -1,6 +1,7 @@
 package com.amadeu.landprotection.claim;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,7 +10,7 @@ import java.util.UUID;
 
 public class ClaimManager {
 
-    public static final int MAX_CLAIMS_PER_PLAYER = 4;
+    public static final int MAX_CLAIMS_PER_PLAYER = 10;
 
     private static final List<Claim> claims = new ArrayList<>();
 
@@ -36,6 +37,15 @@ public class ClaimManager {
         int count = 0;
 
         for (Claim claim : claims) {
+
+            if (claim.isServerClaim()) {
+                continue;
+            }
+
+            if (claim.isArena()) {
+                continue;
+            }
+
             if (claim.getOwner().equals(playerUuid)) {
                 count++;
             }
@@ -52,7 +62,9 @@ public class ClaimManager {
         List<Claim> ownedClaims = new ArrayList<>();
 
         for (Claim claim : claims) {
-            if (claim.getOwner().equals(playerUuid)) {
+            if (!claim.isServerClaim()
+                    && !claim.isArena()
+                    && claim.getOwner().equals(playerUuid)) {
                 ownedClaims.add(claim);
             }
         }
@@ -70,11 +82,78 @@ public class ClaimManager {
         return null;
     }
 
+    public static Claim getSpecialClaimAt(BlockPos pos, String dimension) {
+
+        for (Claim claim : claims) {
+
+            if (!claim.isServerClaim() && !claim.isArena()) {
+                continue;
+            }
+
+            if (claim.contains3D(pos, dimension)) {
+                return claim;
+            }
+        }
+
+        return null;
+    }
+
+    public static Claim getArenaAt(BlockPos pos, String dimension) {
+
+        for (Claim claim : claims) {
+
+            if (!claim.isArena()) {
+                continue;
+            }
+
+            if (claim.contains3D(pos, dimension)) {
+                return claim;
+            }
+        }
+
+        return null;
+    }
+
+    public static Claim getServerClaimAt(BlockPos pos, String dimension) {
+
+        for (Claim claim : claims) {
+
+            if (!claim.isServerClaim()) {
+                continue;
+            }
+
+            if (claim.contains3D(pos, dimension)) {
+                return claim;
+            }
+        }
+
+        return null;
+    }
+
     public static Claim getClaimAtOwnedBy(UUID playerUuid, BlockPos pos, String dimension) {
         for (Claim claim : claims) {
+
+            if (claim.isServerClaim()) {
+                continue;
+            }
+
+            if (claim.isArena()) {
+                continue;
+            }
+
             if (claim.getOwner().equals(playerUuid) && claim.contains(pos, dimension)) {
                 return claim;
             }
+        }
+
+        return null;
+    }
+
+    public static Claim getClaimManageableBy(ServerPlayer player, BlockPos pos, String dimension) {
+        Claim claim = getClaimAt(pos, dimension);
+
+        if (claim != null && claim.canManage(player)) {
+            return claim;
         }
 
         return null;
@@ -92,7 +171,64 @@ public class ClaimManager {
         claims.clear();
     }
 
+    public static boolean canAccess(ServerPlayer player, BlockPos pos, String dimension) {
+
+        Claim specialClaim = getSpecialClaimAt(pos, dimension);
+
+        if (specialClaim != null) {
+            return specialClaim.canAccess(player);
+        }
+
+        Claim claim = getClaimAt(pos, dimension);
+
+        if (claim != null) {
+            return claim.canAccess(player);
+        }
+
+        return true;
+    }
+
+    public static boolean canBuild(ServerPlayer player, BlockPos pos, String dimension) {
+
+        Claim arena = getArenaAt(pos, dimension);
+
+        if (arena != null) {
+            return true;
+        }
+
+        Claim specialClaim = getSpecialClaimAt(pos, dimension);
+
+        if (specialClaim != null) {
+            return specialClaim.canBuild(player);
+        }
+
+        Claim claim = getClaimAt(pos, dimension);
+
+        if (claim != null) {
+            return claim.canBuild(player);
+        }
+
+        return true;
+    }
+
+    public static boolean canManage(ServerPlayer player, BlockPos pos, String dimension) {
+        Claim claim = getClaimAt(pos, dimension);
+
+        if (claim != null) {
+            return claim.canManage(player);
+        }
+
+        return true;
+    }
+
     public static boolean canInteract(UUID playerUuid, BlockPos pos, String dimension) {
+
+        Claim specialClaim = getSpecialClaimAt(pos, dimension);
+
+        if (specialClaim != null) {
+            return specialClaim.canInteract(playerUuid);
+        }
+
         Claim claim = getClaimAt(pos, dimension);
 
         if (claim != null) {
@@ -117,24 +253,20 @@ public class ClaimManager {
     }
 
     private static boolean boxesOverlap(BlockPos a1, BlockPos a2, BlockPos b1, BlockPos b2) {
+
         int aMinX = Math.min(a1.getX(), a2.getX());
         int aMaxX = Math.max(a1.getX(), a2.getX());
-        int aMinY = Math.min(a1.getY(), a2.getY());
-        int aMaxY = Math.max(a1.getY(), a2.getY());
         int aMinZ = Math.min(a1.getZ(), a2.getZ());
         int aMaxZ = Math.max(a1.getZ(), a2.getZ());
 
         int bMinX = Math.min(b1.getX(), b2.getX());
         int bMaxX = Math.max(b1.getX(), b2.getX());
-        int bMinY = Math.min(b1.getY(), b2.getY());
-        int bMaxY = Math.max(b1.getY(), b2.getY());
         int bMinZ = Math.min(b1.getZ(), b2.getZ());
         int bMaxZ = Math.max(b1.getZ(), b2.getZ());
 
         boolean overlapX = aMinX <= bMaxX && aMaxX >= bMinX;
-        boolean overlapY = aMinY <= bMaxY && aMaxY >= bMinY;
         boolean overlapZ = aMinZ <= bMaxZ && aMaxZ >= bMinZ;
 
-        return overlapX && overlapY && overlapZ;
+        return overlapX && overlapZ;
     }
 }

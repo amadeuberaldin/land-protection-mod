@@ -3,7 +3,13 @@
   "package": "com.amadeu.landprotection.mixin",
   "compatibilityLevel": "JAVA_25",
   "mixins": [
-    "VillagerProjectileProtectionMixin"
+    "ProjectileProtectionMixin",
+    "VillagerProjectileProtectionMixin",
+    "ExplosionProtectionMixin",
+    "DragonEggContainerProtectionMixin",
+    "DragonEggShulkerSlotProtectionMixin",
+    "ServerPlayerDeathMixin",
+    "PlayerDropProtectionMixin"
   ],
   "client": [],
   "injectors": {

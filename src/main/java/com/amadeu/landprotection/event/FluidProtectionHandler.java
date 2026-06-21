@@ -1,5 +1,6 @@
 package com.amadeu.landprotection.event;
 
+import com.amadeu.landprotection.claim.Claim;
 import com.amadeu.landprotection.claim.ClaimManager;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.world.item.Items;
@@ -29,10 +30,15 @@ public class FluidProtectionHandler {
 
             String dimension = world.dimension().toString();
 
+            Claim arena = ClaimManager.getArenaAt(targetPos, dimension);
+
+            if (arena != null) {
+                return InteractionResult.PASS;
+            }
+
             if (!ClaimManager.canInteract(player.getUUID(), targetPos, dimension)) {
                 player.sendSystemMessage(
-                        Component.literal("Você não pode despejar líquidos nesta área protegida.")
-                );
+                        Component.literal("Você não pode despejar líquidos nesta área protegida."));
                 return InteractionResult.FAIL;
             }
 
